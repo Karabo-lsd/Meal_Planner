@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "meal-planning-backend"
+version = "0.1.0"
+description = "AI-powered meal planning backend"
+authors = [
+    {name = "System Architect", email = "architect@example.com"}
+]
+dependencies = [
+    "fastapi==0.104.1",
+    "uvicorn[standard]==0.24.0",
+    "sqlalchemy==2.0.23",
+    "alembic==1.12.1",
+    "redis==5.0.1",
+    "pydantic==2.5.0",
+    "pydantic-settings==2.1.0",
+    "python-jose[cryptography]==3.3.0",
+    "passlib[bcrypt]==1.7.4",
+    "python-multipart==0.0.6",
+    "aiofiles==23.2.1",
+    "httpx==0.25.2",
+    "celery==5.3.4",
+    "flower==2.0.1",
+    "prometheus-client==0.19.0",
+    "opentelemetry-distro==0.42b0",
+    "opentelemetry-instrumentation-fastapi==0.42b0",
+    "structlog==23.2.0",
+    "sentry-sdk[fastapi]==1.38.0",
+    "gunicorn==21.2.0",
+    "pytest==7.4.3",
+    "pytest-asyncio==0.21.1",
+    "httpx==0.25.2",
+    "faker==20.1.0",
+]
+
+[tool.setuptools]
+packages = ["meal_planning"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short --strict-markers"
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "slow: Slow tests",
+]
