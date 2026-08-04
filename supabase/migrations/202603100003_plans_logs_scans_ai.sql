@@ -76,7 +76,7 @@ create table if not exists public.food_logs (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint food_logs_slot_chk check (meal_slot in ('breakfast', 'lunch', 'dinner', 'snack')),
-  constraint food_logs_source_chk check (source in ('manual', 'recipe', 'barcode', 'image_scan', 'imported')),
+  constraint food_logs_source_chk check (source in ('manual', 'recipe', 'image_scan', 'imported')),
   constraint food_logs_quantity_chk check (quantity is null or quantity > 0),
   constraint food_logs_confidence_chk check (confidence_score is null or (confidence_score >= 0 and confidence_score <= 1)),
   constraint food_logs_non_negative_nutrition_chk check (
@@ -130,29 +130,6 @@ create index if not exists idx_grocery_list_items_list_id on public.grocery_list
 
 create trigger trg_grocery_list_items_updated_at
 before update on public.grocery_list_items
-for each row execute function public.set_updated_at();
-
-create table if not exists public.barcode_scans (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references public.users(id) on delete cascade,
-  barcode_value text not null,
-  open_food_facts_product_id text,
-  canonical_food_id uuid references public.foods_master(id) on delete set null,
-  raw_response_json jsonb not null,
-  source_reliability text not null default 'community_unverified',
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  constraint barcode_scans_barcode_format_chk check (barcode_value ~ '^[0-9]{8,14}$'),
-  constraint barcode_scans_reliability_chk check (
-    source_reliability in ('community_unverified', 'provider_reported', 'validated_with_usda')
-  )
-);
-
-create index if not exists idx_barcode_scans_user_id on public.barcode_scans(user_id);
-create index if not exists idx_barcode_scans_barcode_value on public.barcode_scans(barcode_value);
-
-create trigger trg_barcode_scans_updated_at
-before update on public.barcode_scans
 for each row execute function public.set_updated_at();
 
 create table if not exists public.image_scans (
@@ -240,7 +217,6 @@ alter table public.meal_plan_items enable row level security;
 alter table public.food_logs enable row level security;
 alter table public.grocery_lists enable row level security;
 alter table public.grocery_list_items enable row level security;
-alter table public.barcode_scans enable row level security;
 alter table public.image_scans enable row level security;
 alter table public.image_scan_predictions enable row level security;
 alter table public.ai_recommendation_logs enable row level security;
@@ -344,11 +320,6 @@ for delete using (
     where gl.id = grocery_list_items.grocery_list_id and gl.user_id = auth.uid()
   )
 );
-
-create policy barcode_scans_select_own on public.barcode_scans
-for select using (auth.uid() = user_id);
-create policy barcode_scans_insert_own on public.barcode_scans
-for insert with check (auth.uid() = user_id);
 
 create policy image_scans_select_own on public.image_scans
 for select using (auth.uid() = user_id);

@@ -50,18 +50,6 @@ async def get_ingredient_nutrition(
     }
 
 
-@router.get("/barcode/{barcode}")
-async def analyze_barcode(barcode: str):
-    if not barcode.isdigit() or not (8 <= len(barcode) <= 14):
-        raise HTTPException(status_code=400, detail="Invalid barcode format")
-
-    return {
-        "barcode": barcode,
-        "status": "not_found",
-        "message": "Barcode integration is not wired yet",
-    }
-
-
 @router.get("/common")
 async def get_common_ingredients(
     category: str | None = Query(None, max_length=100),

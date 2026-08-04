@@ -4,7 +4,7 @@ class AppConfig {
   static const String _defaultLocalBaseUrl = 'http://127.0.0.1:8000';
   static const String _androidEmulatorBaseUrl = 'http://10.0.2.2:8000';
   static const String _configuredBaseUrl =
-      String.fromEnvironment('API_BASE_URL', defaultValue: '');
+      String.fromEnvironment('API_BASE_URL', defaultValue: 'https://api.spoonacular.com');
 
   static String get baseUrl {
     if (_configuredBaseUrl.isNotEmpty) {
@@ -24,8 +24,10 @@ class AppConfig {
   /// Spoonacular API key — injected at build time via --dart-define.
   static const String spoonacularApiKey = String.fromEnvironment(
     'SPOONACULAR_API_KEY',
-    defaultValue: '9ba756725e97405582aacdce34a5e763',
+    defaultValue: '0b93fe311e1c455cbbd51107398d16e5',
   );
+
+  static bool get hasSpoonacularApiKey => spoonacularApiKey.trim().isNotEmpty;
 
   static String get apiBaseUrl => '$baseUrl/$apiVersion';
 

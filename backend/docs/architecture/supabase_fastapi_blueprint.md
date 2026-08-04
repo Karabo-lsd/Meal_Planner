@@ -16,7 +16,6 @@ system/
       pantry/
       recipes/
       meal_plan/
-      barcode/
       image_scan/
       food_logs/
       grocery/
@@ -35,7 +34,6 @@ system/
         recipes.py
         meal_plans.py
         food_logs.py
-        barcode.py
         image_scans.py
         ai_assistant.py
       schemas/
@@ -47,7 +45,6 @@ system/
           spoonacular_client.py
           edamam_client.py
           usda_client.py
-          open_food_facts_client.py
           image_recognition_client.py
           interfaces.py
         normalization/
@@ -60,7 +57,6 @@ system/
           grocery_generator.py
         scans/
           image_scan_pipeline.py
-          barcode_pipeline.py
         ai/
           explanation_service.py
         cache/
@@ -79,7 +75,6 @@ system/
 - Spoonacular: ingredient-to-recipe discovery, pantry utilization, recipe alternatives.
 - Edamam: diet-compliance filtering, nutrition-rich candidate retrieval.
 - USDA FDC: authoritative nutrition validation and canonical nutrient grounding.
-- Open Food Facts: barcode product lookup and ingredients for packaged goods.
 - Image recognition provider: label + confidence + optional portion estimate extraction.
 
 ## 3) Canonical model ownership
@@ -140,7 +135,6 @@ Rules:
 - Redis key classes:
   - `recipe_search:{hash}` TTL 30m
   - `nutrition_lookup:{canonical_food_id}` TTL 24h
-  - `barcode:{barcode}` TTL 12h
   - `normalized_provider_payload:{provider}:{hash}` TTL 24h
 - Never cache user-specific private records in shared keys.
 - USDA validated nutrition can have longer TTL than community-source data.

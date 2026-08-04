@@ -21,6 +21,10 @@ class SpoonacularService {
     String? diet,
     List<String>? includeIngredients,
   }) async {
+    if (!AppConfig.hasSpoonacularApiKey) {
+      return const [];
+    }
+
     final params = <String, dynamic>{
       'apiKey': AppConfig.spoonacularApiKey,
       'number': number,
@@ -45,8 +49,8 @@ class SpoonacularService {
 
     final results = (response.data['results'] as List<dynamic>?) ?? const [];
     return results
-        .map((e) => _toRecipeMap(e as Map<String, dynamic>))
-        .toList();
+      .map((e) => _toRecipeMap(e as Map<String, dynamic>))
+      .toList();
   }
 
   // ─── private helpers ──────────────────────────────────────────────────────

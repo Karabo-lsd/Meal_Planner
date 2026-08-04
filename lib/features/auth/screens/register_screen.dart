@@ -18,6 +18,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _passwordController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    Future.microtask(() => ref.read(authStateProvider.notifier).clearMessages());
+  }
+
+  @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
@@ -55,16 +61,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
-
-    // Navigate to home when immediately signed in after registration
-    if (authState.user != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.of(context).pushReplacementNamed('/home');
-      });
-    }
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFEDEFFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Stack(
           children: [
@@ -74,10 +74,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               child: Container(
                 width: 240,
                 height: 240,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
-                    colors: [Color(0x66C2F0E3), Color(0x00C2F0E3)],
+                    colors: [
+                      colorScheme.primary.withValues(alpha: 0.22),
+                      colorScheme.primary.withValues(alpha: 0),
+                    ],
                   ),
                 ),
               ),
@@ -88,110 +91,147 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               child: Container(
                 width: 240,
                 height: 240,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
-                    colors: [Color(0x66E8C8FF), Color(0x00E8C8FF)],
+                    colors: [
+                      colorScheme.secondary.withValues(alpha: 0.2),
+                      colorScheme.secondary.withValues(alpha: 0),
+                    ],
                   ),
                 ),
               ),
             ),
-            SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 24),
-                  Text(
-                    'Create Account',
-                    style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Set up your profile and goals in minutes.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: const Color(0xFF7D8799),
-                        ),
-                  ),
-                  const SizedBox(height: 24),
-                  GlassPanel(
-                    padding: const EdgeInsets.all(18),
-                    radius: 20,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        TextInput(controller: _nameController, label: 'Full name'),
-                        const SizedBox(height: 14),
-                        TextInput(
-                          controller: _emailController,
-                          label: 'Email',
-                          keyboardType: TextInputType.emailAddress,
-                        ),
-                        const SizedBox(height: 14),
-                        TextInput(
-                          controller: _passwordController,
-                          label: 'Password',
-                          obscure: true,
-                        ),
-                        const SizedBox(height: 18),
-                        if (authState.error != null)
+            LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight - 48),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 520),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
                           Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFF0F0),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              authState.error!,
-                              style: const TextStyle(color: Colors.redAccent),
+                            alignment: Alignment.center,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primaryContainer.withValues(alpha: 0.75),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                'Create your profile',
+                                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                      color: colorScheme.primary,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                              ),
                             ),
                           ),
-                        if (authState.error != null) const SizedBox(height: 12),
-                        if (authState.successMessage != null)
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEDF7EE),
-                              borderRadius: BorderRadius.circular(12),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Create Account',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  height: 1.05,
+                                ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Set up your profile and goals in minutes.',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.onSurface.withValues(alpha: 0.78),
                             ),
-                            child: Row(
+                          ),
+                          const SizedBox(height: 28),
+                          GlassPanel(
+                            padding: const EdgeInsets.all(20),
+                            radius: 24,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                const Icon(Icons.check_circle_outline,
-                                    color: Color(0xFF2E7D32), size: 18),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    authState.successMessage!,
-                                    style: const TextStyle(
-                                        color: Color(0xFF2E7D32)),
+                                TextInput(controller: _nameController, label: 'Full name'),
+                                const SizedBox(height: 14),
+                                TextInput(
+                                  controller: _emailController,
+                                  label: 'Email',
+                                  keyboardType: TextInputType.emailAddress,
+                                ),
+                                const SizedBox(height: 14),
+                                TextInput(
+                                  controller: _passwordController,
+                                  label: 'Password',
+                                  obscure: true,
+                                ),
+                                const SizedBox(height: 18),
+                                if (authState.error != null)
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.errorContainer,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      authState.error!,
+                                      style: TextStyle(color: colorScheme.onErrorContainer),
+                                    ),
                                   ),
+                                if (authState.error != null) const SizedBox(height: 12),
+                                if (authState.successMessage != null)
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.primaryContainer,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.check_circle_outline,
+                                          color: colorScheme.primary,
+                                          size: 18,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            authState.successMessage!,
+                                            style: TextStyle(color: colorScheme.primary),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                if (authState.successMessage != null)
+                                  const SizedBox(height: 12),
+                                PrimaryButton(
+                                  label: 'Register',
+                                  loading: authState.isLoading,
+                                  onPressed: _submit,
                                 ),
                               ],
                             ),
                           ),
-                        if (authState.successMessage != null)
-                          const SizedBox(height: 12),
-                        PrimaryButton(
-                          label: 'Register',
-                          loading: authState.isLoading,
-                          onPressed: _submit,
-                        ),
-                      ],
+                          const SizedBox(height: 16),
+                          Center(
+                            child: TextButton(
+                              onPressed: () {
+                                ref.read(authStateProvider.notifier).clearMessages();
+                                Navigator.of(context).pushReplacementNamed('/login');
+                              },
+                              child: const Text('Already have an account? Log in'),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 14),
-                  Center(
-                    child: TextButton(
-                      onPressed: () {
-                        Navigator.of(context).pushReplacementNamed('/login');
-                      },
-                      child: const Text('Already have an account? Log in'),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ],

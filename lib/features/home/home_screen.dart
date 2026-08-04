@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'main_screen.dart';
+import 'dashboard_screen_premium.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // legacy wrapper to new MainScreen
-    return const MainScreen();
+    return const DashboardScreen();
   }
 }
 /*
@@ -134,12 +133,13 @@ class HomeScreen extends ConsumerWidget {
   }
 
   Widget _buildChartBar(double heightFactor) {
+    final primary = Theme.of(context).colorScheme.primary;
     return Expanded(
       child: Container(
         height: 100 * heightFactor,
         margin: const EdgeInsets.symmetric(horizontal: 2),
         decoration: BoxDecoration(
-          color: Colors.purple[400],
+          color: primary,
           borderRadius: BorderRadius.circular(4),
         ),
       ),
@@ -147,19 +147,24 @@ class HomeScreen extends ConsumerWidget {
   }
 
   Widget _buildToggleButton(String label, bool isActive, VoidCallback onTap) {
+    final colorScheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         margin: const EdgeInsets.symmetric(horizontal: 4),
         decoration: BoxDecoration(
-          color: isActive ? Colors.purple : Colors.grey[200],
+          color: isActive
+              ? colorScheme.primary
+              : colorScheme.primaryContainer.withValues(alpha: 0.35),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: isActive ? Colors.white : Colors.grey[600],
+            color: isActive
+                ? colorScheme.onPrimary
+                : colorScheme.onSurface.withValues(alpha: 0.7),
             fontSize: 12,
             fontWeight: FontWeight.w500,
           ),
@@ -260,6 +265,7 @@ class HomeScreen extends ConsumerWidget {
   }
 
   Widget _buildMealStatItem(String day, int calories) {
+    final primary = Theme.of(context).colorScheme.primary;
     return Column(
       children: [
         Container(
@@ -269,7 +275,10 @@ class HomeScreen extends ConsumerWidget {
             gradient: LinearGradient(
               begin: Alignment.bottomCenter,
               end: Alignment.topCenter,
-              colors: [Colors.purple[400]!, Colors.purple[400]!.withOpacity(0.5)],
+              colors: [
+                primary,
+                primary.withValues(alpha: 0.5),
+              ],
             ),
             borderRadius: BorderRadius.circular(8),
           ),

@@ -12,7 +12,7 @@ class PantryIngredientInput(BaseModel):
     quantity: float = Field(gt=0)
     unit: str = Field(min_length=1, max_length=50)
     expiry_date: Optional[str] = None
-    source: Literal["manual", "barcode", "image_scan", "imported"] = "manual"
+    source: Literal["manual", "image_scan", "imported"] = "manual"
 
 
 class IngredientSearchRequest(BaseModel):

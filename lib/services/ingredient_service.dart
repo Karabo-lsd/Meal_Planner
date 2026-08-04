@@ -3,7 +3,25 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class IngredientService {
   final _supabase = Supabase.instance.client;
 
-  String get _userId => _supabase.auth.currentUser!.id;
+  User? get _currentUser => _supabase.auth.currentUser;
+
+  String _userIdOrThrow() {
+    final user = _currentUser;
+    if (user == null) {
+      throw StateError('You must be signed in to save pantry items.');
+    }
+    return user.id;
+  }
+
+  Future<void> _ensureUserRow() async {
+    final user = _currentUser;
+    if (user == null) return;
+
+    await _supabase.from('users').upsert({
+      'id': user.id,
+      'email': user.email ?? '',
+    });
+  }
 
   // ── foods_master search ───────────────────────────────────
 
@@ -70,11 +88,16 @@ class IngredientService {
   // ── pantry_items CRUD ─────────────────────────────────────
 
   Future<List<Map<String, dynamic>>> getPantryItems() async {
+    final user = _currentUser;
+    if (user == null) {
+      return const [];
+    }
+
     return List<Map<String, dynamic>>.from(
       await _supabase
           .from('pantry_items')
           .select('*, foods_master(canonical_name, food_nutrition(*))')
-          .eq('user_id', _userId)
+          .eq('user_id', user.id)
           .order('created_at', ascending: false),
     );
   }
@@ -92,11 +115,16 @@ class IngredientService {
     DateTime? expiryDate,
     String source = 'manual',
   }) async {
+    await _ensureUserRow();
+    final userId = _userIdOrThrow();
+
     return await _supabase
         .from('pantry_items')
         .insert({
-          'user_id': _userId,
-          if (canonicalFoodId != null) 'canonical_food_id': canonicalFoodId,
+          'user_id': userId,
+          ...?canonicalFoodId != null
+              ? {'canonical_food_id': canonicalFoodId}
+              : null,
           'ingredient_name_raw': ingredientNameRaw,
           'ingredient_name_normalized': ingredientNameRaw.toLowerCase().trim(),
           'quantity': quantity,
@@ -141,22 +169,6 @@ class IngredientService {
 
   Future<void> deleteCustomIngredient(dynamic id) =>
       deletePantryItem(id.toString());
-
-  // ── barcode lookup (Open Food Facts via Supabase cache) ───
-
-  Future<Map<String, dynamic>> analyzeBarcode(String barcode) async {
-    // Check if we have a cached scan for this barcode
-    final cached = await _supabase
-        .from('barcode_scans')
-        .select('*, foods_master(*, food_nutrition(*))')
-        .eq('barcode_value', barcode)
-        .maybeSingle();
-
-    if (cached != null) return cached;
-
-    // No cache — caller should handle via FoodScanService / backend
-    throw Exception('Barcode $barcode not found in local database.');
-  }
 
   // Stubs kept for API compat (not backed by Supabase data)
   Future<List<Map<String, dynamic>>> getSeasonalIngredients(

@@ -36,8 +36,8 @@ dependencies = [
     "faker==20.1.0",
 ]
 
-[tool.setuptools]
-packages = ["meal_planning"]
+[tool.setuptools.packages.find]
+include = ["meal_planning*", "scripts*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

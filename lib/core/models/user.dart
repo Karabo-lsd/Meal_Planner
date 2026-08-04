@@ -14,7 +14,7 @@ class User {
   });
 
   String get displayName {
-    final parts = [firstName, lastName].where((s) => s != null && s!.isNotEmpty).toList();
+    final parts = [firstName, lastName].where((s) => s != null && s.isNotEmpty).toList();
     return parts.isEmpty ? email : parts.join(' ');
   }
 

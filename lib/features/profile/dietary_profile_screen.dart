@@ -18,6 +18,7 @@ class _DietaryProfileScreenState extends ConsumerState<DietaryProfileScreen> {
   final _carbsController = TextEditingController();
   final _fatController = TextEditingController();
   String _diet = 'balanced';
+  bool _initializedFromState = false;
 
   @override
   void dispose() {
@@ -29,27 +30,74 @@ class _DietaryProfileScreenState extends ConsumerState<DietaryProfileScreen> {
   }
 
   Future<void> _save() async {
+    final calories = int.tryParse(_caloriesController.text);
+    final proteinRatio = double.tryParse(_proteinController.text);
+    final carbsRatio = double.tryParse(_carbsController.text);
+    final fatRatio = double.tryParse(_fatController.text);
+
+    final proteinTarget = _macroTargetFromRatio(calories, proteinRatio, 4);
+    final carbsTarget = _macroTargetFromRatio(calories, carbsRatio, 4);
+    final fatTarget = _macroTargetFromRatio(calories, fatRatio, 9);
+
     final data = {
+      'diet_type': _diet,
+      'daily_calorie_target': calories,
+      'daily_protein_target': proteinTarget,
+      'daily_carb_target': carbsTarget,
+      'daily_fat_target': fatTarget,
       'preferences': {'diet': _diet},
       'goals': {
-        'daily_calories': int.tryParse(_caloriesController.text),
-        'protein_ratio': double.tryParse(_proteinController.text),
-        'carb_ratio': double.tryParse(_carbsController.text),
-        'fat_ratio': double.tryParse(_fatController.text),
+        'daily_calories': calories,
+        'protein_ratio': proteinRatio,
+        'carb_ratio': carbsRatio,
+        'fat_ratio': fatRatio,
       },
     };
 
-    await ref.read(dietaryProfileProvider.notifier).updateProfile(data);
-    if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Dietary profile updated')));
+    try {
+      await ref.read(dietaryProfileProvider.notifier).updateProfile(data);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Dietary profile updated')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not save dietary profile: $e')),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final profile = ref.watch(dietaryProfileProvider);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    if (!_initializedFromState && profile.isNotEmpty) {
+      _caloriesController.text =
+          _numberToText(profile['daily_calorie_target'] ?? profile['daily_calories']);
+      _proteinController.text = _numberToText(
+        (profile['goals'] is Map)
+            ? (profile['goals'] as Map)['protein_ratio']
+            : null,
+      );
+      _carbsController.text = _numberToText(
+        (profile['goals'] is Map) ? (profile['goals'] as Map)['carb_ratio'] : null,
+      );
+      _fatController.text = _numberToText(
+        (profile['goals'] is Map) ? (profile['goals'] as Map)['fat_ratio'] : null,
+      );
+
+      final profileDiet = profile['diet_type']?.toString();
+      final prefsDiet = (profile['preferences'] is Map)
+          ? (profile['preferences'] as Map)['diet']?.toString()
+          : null;
+      _diet = (prefsDiet ?? profileDiet ?? _diet).toString();
+      _initializedFromState = true;
+    }
+
     return Scaffold(
-      backgroundColor: const Color(0xFFEDEFFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Dietary Profile'),
         backgroundColor: Colors.transparent,
@@ -63,10 +111,13 @@ class _DietaryProfileScreenState extends ConsumerState<DietaryProfileScreen> {
             child: Container(
               width: 250,
               height: 250,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
-                  colors: [Color(0x66B9C7FF), Color(0x00B9C7FF)],
+                  colors: [
+                    colorScheme.primary.withValues(alpha: 0.22),
+                    colorScheme.primary.withValues(alpha: 0),
+                  ],
                 ),
               ),
             ),
@@ -81,9 +132,15 @@ class _DietaryProfileScreenState extends ConsumerState<DietaryProfileScreen> {
                   children: [
                     DropdownButtonFormField<String>(
                       initialValue: _diet,
-                      decoration: const InputDecoration(
-                    labelText: 'Diet preference',
-                  ),
+                      decoration: _profileInputDecoration(
+                        context,
+                        'Diet preference',
+                      ),
+                      dropdownColor: colorScheme.surface,
+                      style: TextStyle(
+                        color: colorScheme.onSurface,
+                        fontWeight: FontWeight.w600,
+                      ),
                       items: const [
                         DropdownMenuItem(
                       value: 'balanced',
@@ -105,31 +162,25 @@ class _DietaryProfileScreenState extends ConsumerState<DietaryProfileScreen> {
                     TextField(
                       controller: _caloriesController,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                    labelText: 'Daily calories',
-                  ),
+                      decoration: _profileInputDecoration(context, 'Daily calories'),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _proteinController,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                    labelText: 'Protein ratio (%)',
-                  ),
+                      decoration: _profileInputDecoration(context, 'Protein ratio (%)'),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _carbsController,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                    labelText: 'Carbs ratio (%)',
-                  ),
+                      decoration: _profileInputDecoration(context, 'Carbs ratio (%)'),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _fatController,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Fat ratio (%)'),
+                      decoration: _profileInputDecoration(context, 'Fat ratio (%)'),
                     ),
                   ],
                 ),
@@ -139,7 +190,8 @@ class _DietaryProfileScreenState extends ConsumerState<DietaryProfileScreen> {
                 height: 50,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2A3142),
+                    backgroundColor: colorScheme.primary,
+                    foregroundColor: colorScheme.onPrimary,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
@@ -151,6 +203,47 @@ class _DietaryProfileScreenState extends ConsumerState<DietaryProfileScreen> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  double? _macroTargetFromRatio(int? calories, double? ratioPercent, int caloriesPerGram) {
+    if (calories == null || ratioPercent == null) return null;
+    return (calories * (ratioPercent / 100.0)) / caloriesPerGram;
+  }
+
+  String _numberToText(dynamic value) {
+    if (value == null) return '';
+    if (value is int) return value.toString();
+    if (value is double) {
+      if (value == value.roundToDouble()) return value.toInt().toString();
+      return value.toStringAsFixed(1);
+    }
+    final parsed = double.tryParse(value.toString());
+    if (parsed == null) return '';
+    if (parsed == parsed.roundToDouble()) return parsed.toInt().toString();
+    return parsed.toStringAsFixed(1);
+  }
+
+  InputDecoration _profileInputDecoration(BuildContext context, String label) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return InputDecoration(
+      labelText: label,
+      labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+      filled: true,
+      fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(
+          color: colorScheme.outline.withValues(alpha: 0.42),
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(
+          color: colorScheme.primary,
+          width: 1.8,
+        ),
       ),
     );
   }

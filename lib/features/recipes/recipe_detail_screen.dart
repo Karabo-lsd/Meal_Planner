@@ -24,18 +24,26 @@ class RecipeDetailScreen extends StatelessWidget {
       ...?recipe.supportedDiets,
       if (recipe.cuisine != null) recipe.cuisine!,
     ].map((t) => _capitalize(t)).toSet().toList();
+    final colorScheme = Theme.of(context).colorScheme;
+    final panelColor = colorScheme.surface.withValues(alpha: 0.96);
+    final panelBorder = colorScheme.outline.withValues(alpha: 0.34);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFEDEFFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: colorScheme.surface.withValues(alpha: 0.94),
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
         elevation: 0,
-        leading: BackButton(color: Colors.black),
+        leading: BackButton(color: colorScheme.onSurface),
         title: Text(
           recipe.title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: Colors.black),
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w800,
+              ),
         ),
       ),
       body: Stack(
@@ -46,20 +54,25 @@ class RecipeDetailScreen extends StatelessWidget {
             child: Container(
               width: 230,
               height: 230,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
-                  colors: [Color(0x66D9CAFF), Color(0x00D9CAFF)],
+                  colors: [
+                    colorScheme.primary.withValues(alpha: 0.2),
+                    colorScheme.primary.withValues(alpha: 0),
+                  ],
                 ),
               ),
             ),
           ),
           ListView(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             children: [
               // ── Hero image ────────────────────────────────
               GlassPanel(
                 radius: 20,
+                color: panelColor,
+                borderColor: panelBorder,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(20),
                   child: (imageUrl != null && imageUrl.isNotEmpty)
@@ -84,36 +97,36 @@ class RecipeDetailScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 16, vertical: 14),
                 radius: 16,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                color: panelColor,
+                borderColor: panelBorder,
+                child: Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  runSpacing: 12,
+                  spacing: 12,
                   children: [
                     _macroTile(context, '${recipe.calories ?? 0}',
-                        'kcal', const Color(0xFF5B8DEF)),
-                    _divider(),
+                        'kcal', colorScheme.primary),
                     _macroTile(
                         context,
                         '${(recipe.protein ?? 0).toStringAsFixed(1)}g',
                         'Protein',
-                        const Color(0xFF58C27D)),
-                    _divider(),
+                        const Color(0xFF1E7F43)),
                     _macroTile(
                         context,
                         '${(recipe.carbs ?? 0).toStringAsFixed(1)}g',
                         'Carbs',
-                        const Color(0xFFEF9B5B)),
-                    _divider(),
+                        const Color(0xFF1E5E9A)),
                     _macroTile(
                         context,
                         '${(recipe.fat ?? 0).toStringAsFixed(1)}g',
                         'Fat',
-                        const Color(0xFFE06C8A)),
-                    if (recipe.prepTime != null) ...[  
-                      _divider(),
+                        const Color(0xFF8A5A12)),
+                    if (recipe.prepTime != null) ...[
                       _macroTile(
                           context,
                           '${recipe.prepTime}',
                           'min',
-                          const Color(0xFF9B8DEF)),
+                          colorScheme.tertiary),
                     ],
                   ],
                 ),
@@ -127,12 +140,18 @@ class RecipeDetailScreen extends StatelessWidget {
                   runSpacing: 6,
                   children: allTags
                       .map((t) => Chip(
-                            label: Text(t,
-                                style: const TextStyle(fontSize: 12)),
+                            label: Text(
+                              t,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: colorScheme.onPrimaryContainer,
+                              ),
+                            ),
                             backgroundColor:
-                                const Color(0x66E8EEFF),
-                            side: const BorderSide(
-                                color: Color(0x55A0AACC)),
+                              colorScheme.primaryContainer.withValues(alpha: 0.78),
+                            side: BorderSide(
+                              color: colorScheme.primary.withValues(alpha: 0.45)),
                             visualDensity:
                                 VisualDensity.compact,
                           ))
@@ -147,14 +166,21 @@ class RecipeDetailScreen extends StatelessWidget {
                     style: Theme.of(context)
                         .textTheme
                         .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w700)),
+                        ?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: colorScheme.onSurface,
+                        )),
                 const SizedBox(height: 8),
                 GlassPanel(
                   padding: const EdgeInsets.all(14),
                   radius: 16,
+                  color: panelColor,
+                  borderColor: panelBorder,
                   child: Text(
                     recipe.description!,
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurface,
+                        ),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -166,11 +192,16 @@ class RecipeDetailScreen extends StatelessWidget {
                     style: Theme.of(context)
                         .textTheme
                         .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w700)),
+                        ?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: colorScheme.onSurface,
+                        )),
                 const SizedBox(height: 8),
                 GlassPanel(
                   padding: const EdgeInsets.all(14),
                   radius: 16,
+                  color: panelColor,
+                  borderColor: panelBorder,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: recipe.ingredients!
@@ -181,16 +212,17 @@ class RecipeDetailScreen extends StatelessWidget {
                                 crossAxisAlignment:
                                     CrossAxisAlignment.start,
                                 children: [
-                                  const Text('• ',
+                                    Text('• ',
                                       style: TextStyle(
-                                          color: Color(0xFF5B8DEF),
-                                          fontWeight: FontWeight.bold)),
+                                        color: colorScheme.primary,
+                                        fontWeight: FontWeight.bold)),
                                   Expanded(
                                     child: Text(
                                       _capitalize(ing),
                                       style: Theme.of(context)
                                           .textTheme
-                                          .bodyMedium,
+                                          .bodyMedium
+                                          ?.copyWith(color: colorScheme.onSurface),
                                     ),
                                   ),
                                 ],
@@ -207,21 +239,30 @@ class RecipeDetailScreen extends StatelessWidget {
                   style: Theme.of(context)
                       .textTheme
                       .titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w700)),
+                      ?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: colorScheme.onSurface,
+                      )),
               const SizedBox(height: 8),
               if ((recipe.steps ?? const []).isEmpty)
                 GlassPanel(
                   padding: const EdgeInsets.all(14),
                   radius: 16,
+                  color: panelColor,
+                  borderColor: panelBorder,
                   child: Text(
                     'Detailed steps are not available for this recipe.',
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurface,
+                        ),
                   ),
                 )
               else
                 GlassPanel(
                   padding: const EdgeInsets.all(14),
                   radius: 16,
+                  color: panelColor,
+                  borderColor: panelBorder,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: recipe.steps!
@@ -239,9 +280,9 @@ class RecipeDetailScreen extends StatelessWidget {
                                     height: 26,
                                     margin: const EdgeInsets.only(
                                         right: 10, top: 1),
-                                    decoration: const BoxDecoration(
+                                    decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      color: Color(0xFF5B8DEF),
+                                      color: colorScheme.primary,
                                     ),
                                     child: Center(
                                       child: Text(
@@ -259,7 +300,8 @@ class RecipeDetailScreen extends StatelessWidget {
                                       e.value,
                                       style: Theme.of(context)
                                           .textTheme
-                                          .bodyMedium,
+                                          .bodyMedium
+                                          ?.copyWith(color: colorScheme.onSurface),
                                     ),
                                   ),
                                 ],
@@ -277,9 +319,9 @@ class RecipeDetailScreen extends StatelessWidget {
 
   Widget _imagePlaceholder() => Container(
         height: 220,
-        color: const Color(0xFFEFF4FF),
+        color: const Color(0xFFD4E8D7),
         child: const Center(
-          child: Icon(Icons.fastfood, size: 68, color: Color(0xFF57637B)),
+          child: Icon(Icons.fastfood, size: 68, color: Color(0xFF224A2E)),
         ),
       );
 
@@ -298,14 +340,10 @@ class RecipeDetailScreen extends StatelessWidget {
             style: Theme.of(context)
                 .textTheme
                 .labelSmall
-                ?.copyWith(color: const Color(0xFF7D8799))),
+                ?.copyWith(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.78))),
       ],
     );
   }
-
-  Widget _divider() => const SizedBox(
-      height: 32,
-      child: VerticalDivider(width: 1, color: Color(0x44000000)));
 
   String _capitalize(String s) =>
       s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1)}';

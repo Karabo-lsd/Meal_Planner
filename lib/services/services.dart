@@ -3,6 +3,7 @@ export 'auth_service.dart';
 export 'spoonacular_service.dart';
 export 'session_storage.dart';
 export 'meal_service.dart';
+export 'meal_plan_service.dart';
 export 'recipe_service.dart';
 export 'analytics_service.dart';
 export 'user_profile_service.dart';

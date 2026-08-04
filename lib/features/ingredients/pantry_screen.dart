@@ -14,6 +14,7 @@ class PantryScreen extends ConsumerStatefulWidget {
 
 class _PantryScreenState extends ConsumerState<PantryScreen> {
   final _nameController = TextEditingController();
+  bool _isSaving = false;
 
   @override
   void dispose() {
@@ -21,20 +22,39 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
     super.dispose();
   }
 
-  void _addIngredient() {
+  Future<void> _addIngredient() async {
     final name = _nameController.text.trim();
-    if (name.isEmpty) return;
+    if (name.isEmpty || _isSaving) return;
+
     final ingredient = Ingredient(name: name, custom: true);
-    ref.read(pantryProvider.notifier).addIngredient(ingredient);
-    _nameController.clear();
+    setState(() => _isSaving = true);
+
+    try {
+      await ref.read(pantryProvider.notifier).addIngredient(ingredient);
+      _nameController.clear();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Added $name to pantry')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to save ingredient: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final pantry = ref.watch(pantryProvider);
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFEDEFFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('My Pantry'),
         backgroundColor: Colors.transparent,
@@ -48,10 +68,13 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
             child: Container(
               width: 250,
               height: 250,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
-                  colors: [Color(0x66FFD8B9), Color(0x00FFD8B9)],
+                  colors: [
+                    colorScheme.primary.withValues(alpha: 0.18),
+                    colorScheme.primary.withValues(alpha: 0),
+                  ],
                 ),
               ),
             ),
@@ -68,6 +91,8 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
                       Expanded(
                         child: TextField(
                           controller: _nameController,
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: (_) => _addIngredient(),
                           decoration: const InputDecoration(
                             hintText: 'Ingredient name',
                             border: InputBorder.none,
@@ -75,8 +100,8 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.add_circle, color: Color(0xFF2A3142)),
-                        onPressed: _addIngredient,
+                        icon: Icon(Icons.add_circle, color: colorScheme.primary),
+                        onPressed: _isSaving ? null : _addIngredient,
                       )
                     ],
                   ),
@@ -93,7 +118,10 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
                         child: ListTile(
                           title: Text(ing.name),
                           trailing: IconButton(
-                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                            icon: Icon(
+                              Icons.delete_outline,
+                              color: colorScheme.primary,
+                            ),
                             onPressed: () =>
                                 ref.read(pantryProvider.notifier).removeIngredient(ing),
                           ),

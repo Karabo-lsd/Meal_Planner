@@ -3,31 +3,138 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class UserProfileService {
   final _supabase = Supabase.instance.client;
 
-  String get _userId => _supabase.auth.currentUser!.id;
+  User? get _currentUser => _supabase.auth.currentUser;
+
+  String _userIdOrThrow() {
+    final user = _currentUser;
+    if (user == null) {
+      throw StateError('You must be signed in to save your dietary profile.');
+    }
+    return user.id;
+  }
+
+  Future<void> _ensureUserRow() async {
+    final currentUser = _currentUser;
+    if (currentUser == null) return;
+
+    await _supabase
+        .from('users')
+        .upsert({
+          'id': currentUser.id,
+          'email': currentUser.email ?? '',
+        })
+        .select()
+        .single();
+  }
 
   // ── user_profiles ─────────────────────────────────────────
 
   Future<Map<String, dynamic>?> getProfile() async {
+    final user = _currentUser;
+    if (user == null) return null;
+
     return await _supabase
         .from('user_profiles')
         .select()
-        .eq('user_id', _userId)
+      .eq('user_id', user.id)
         .maybeSingle();
   }
 
   Future<Map<String, dynamic>> upsertProfile(
       Map<String, dynamic> data) async {
+    await _ensureUserRow();
+    final userId = _userIdOrThrow();
+
     return await _supabase
         .from('user_profiles')
-        .upsert({...data, 'user_id': _userId})
+      .upsert({...data, 'user_id': userId})
         .select()
         .single();
   }
 
-  // Convenience wrappers kept for backward compat with screens
+  // Convenience wrapper kept for backward compat with screens.
+  // Supports legacy nested payloads: { preferences: {...}, goals: {...} }
+  // and maps them to user_profiles + dietary_preferences tables.
   Future<Map<String, dynamic>> updateProfile(
-      Map<String, dynamic> profileData) =>
-      upsertProfile(profileData);
+      Map<String, dynamic> profileData) async {
+    final payload = Map<String, dynamic>.from(profileData);
+    final nestedPreferences = payload.remove('preferences');
+    final nestedGoals = payload.remove('goals');
+
+    final profileUpdates = <String, dynamic>{...payload};
+    final preferenceUpdates = <String, dynamic>{};
+
+    if (nestedPreferences is Map) {
+      final preferences = Map<String, dynamic>.from(nestedPreferences);
+      final diet = preferences['diet'];
+      if (diet is String && diet.trim().isNotEmpty) {
+        preferenceUpdates['diet_type'] = diet.trim();
+        profileUpdates['diet_type'] = diet.trim();
+      }
+    }
+
+    if (nestedGoals is Map) {
+      final goals = Map<String, dynamic>.from(nestedGoals);
+
+      final dailyCalories = _asDouble(
+        goals['daily_calories'] ??
+            goals['daily_calorie_target'] ??
+            goals['target_calories'],
+      );
+
+      if (dailyCalories != null) {
+        profileUpdates['daily_calorie_target'] = dailyCalories;
+      }
+
+      profileUpdates['daily_protein_target'] = _macroTargetFrom(
+        goals: goals,
+        calories: dailyCalories,
+        ratioKeys: const ['protein_ratio'],
+        targetKeys: const ['daily_protein_target', 'target_protein'],
+        caloriesPerGram: 4,
+      );
+
+      profileUpdates['daily_carb_target'] = _macroTargetFrom(
+        goals: goals,
+        calories: dailyCalories,
+        ratioKeys: const ['carb_ratio'],
+        targetKeys: const ['daily_carb_target', 'target_carbs'],
+        caloriesPerGram: 4,
+      );
+
+      profileUpdates['daily_fat_target'] = _macroTargetFrom(
+        goals: goals,
+        calories: dailyCalories,
+        ratioKeys: const ['fat_ratio'],
+        targetKeys: const ['daily_fat_target', 'target_fat'],
+        caloriesPerGram: 9,
+      );
+    }
+
+    if (profileUpdates['daily_calories'] != null &&
+        profileUpdates['daily_calorie_target'] == null) {
+      profileUpdates['daily_calorie_target'] =
+          _asDouble(profileUpdates.remove('daily_calories'));
+    }
+
+    profileUpdates.removeWhere((_, value) => value == null);
+
+    final profileRow = profileUpdates.isNotEmpty
+        ? await upsertProfile(profileUpdates)
+        : (await getProfile() ?? <String, dynamic>{});
+
+    Map<String, dynamic>? dietaryRow;
+    if (preferenceUpdates.isNotEmpty) {
+      dietaryRow = await upsertDietaryPreferences(preferenceUpdates);
+    }
+
+    return {
+      ...profileRow,
+      if (dietaryRow != null) ...dietaryRow,
+      if (preferenceUpdates['diet_type'] != null)
+        'diet_type': preferenceUpdates['diet_type'],
+    };
+  }
 
   Future<Map<String, dynamic>> getNutritionGoals() async {
     final row = await getProfile();
@@ -51,18 +158,24 @@ class UserProfileService {
   // ── dietary_preferences ───────────────────────────────────
 
   Future<Map<String, dynamic>?> getDietaryPreferences() async {
+    final user = _currentUser;
+    if (user == null) return null;
+
     return await _supabase
         .from('dietary_preferences')
         .select()
-        .eq('user_id', _userId)
+      .eq('user_id', user.id)
         .maybeSingle();
   }
 
   Future<Map<String, dynamic>> upsertDietaryPreferences(
       Map<String, dynamic> prefs) async {
+    await _ensureUserRow();
+    final userId = _userIdOrThrow();
+
     return await _supabase
         .from('dietary_preferences')
-        .upsert({...prefs, 'user_id': _userId})
+      .upsert({...prefs, 'user_id': userId})
         .select()
         .single();
   }
@@ -134,5 +247,39 @@ class UserProfileService {
   Future<Map<String, dynamic>> updatePreferencesLegacy(
       Map<String, dynamic> prefs) =>
       upsertDietaryPreferences(prefs);
+
+  double? _asDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString());
+  }
+
+  double? _macroTargetFrom({
+    required Map<String, dynamic> goals,
+    required double? calories,
+    required List<String> ratioKeys,
+    required List<String> targetKeys,
+    required int caloriesPerGram,
+  }) {
+    for (final key in targetKeys) {
+      final direct = _asDouble(goals[key]);
+      if (direct != null) {
+        return direct;
+      }
+    }
+
+    if (calories == null || calories <= 0) {
+      return null;
+    }
+
+    for (final key in ratioKeys) {
+      final ratio = _asDouble(goals[key]);
+      if (ratio != null) {
+        return (calories * (ratio / 100.0)) / caloriesPerGram;
+      }
+    }
+
+    return null;
+  }
 
 }

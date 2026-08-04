@@ -9,14 +9,14 @@ void main() {
       final engine = RecommendationEngine();
       final recipes = [
         Recipe(
-          id: 1,
+          id: '1',
           title: 'Keto Omelette',
           ingredients: const ['egg', 'cheese'],
           calories: 450,
           supportedDiets: const ['keto'],
         ),
         Recipe(
-          id: 2,
+          id: '2',
           title: 'Protein Bowl',
           ingredients: const ['chicken', 'rice'],
           calories: 550,
@@ -43,8 +43,8 @@ void main() {
     test('respects daily calories goal', () {
       final engine = RecommendationEngine();
       final recipes = [
-        Recipe(id: 1, title: 'Light Salad', calories: 350),
-        Recipe(id: 2, title: 'Heavy Pasta', calories: 900),
+        Recipe(id: '1', title: 'Light Salad', calories: 350),
+        Recipe(id: '2', title: 'Heavy Pasta', calories: 900),
       ];
 
       final result = engine.rankAndFilter(

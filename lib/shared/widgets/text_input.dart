@@ -16,6 +16,7 @@ class TextInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return TextField(
       controller: controller,
       obscureText: obscure,
@@ -23,18 +24,18 @@ class TextInput extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         filled: true,
-        fillColor: const Color(0xFFF9FAFD),
-        border: const OutlineInputBorder(
+        fillColor: colorScheme.surface,
+        border: OutlineInputBorder(
           borderRadius: BorderRadius.all(Radius.circular(14)),
-          borderSide: BorderSide(color: Color(0xFFE3E7F0)),
+          borderSide: BorderSide(color: colorScheme.outline.withValues(alpha: 0.45)),
         ),
-        enabledBorder: const OutlineInputBorder(
+        enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.all(Radius.circular(14)),
-          borderSide: BorderSide(color: Color(0xFFE3E7F0)),
+          borderSide: BorderSide(color: colorScheme.outline.withValues(alpha: 0.45)),
         ),
-        focusedBorder: const OutlineInputBorder(
+        focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.all(Radius.circular(14)),
-          borderSide: BorderSide(color: Color(0xFF2A3142), width: 1.5),
+          borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
         ),
       ),
     );

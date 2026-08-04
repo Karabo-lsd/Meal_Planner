@@ -2,13 +2,44 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug (with Supabase)",
+      "name": "Debug (Cloud Supabase from env)",
       "request": "launch",
       "type": "dart",
       "args": [
-        "--dart-define=SUPABASE_URL=https://ivlktsefeogazukqwleo.supabase.co",
-        "--dart-define=SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2bGt0c2VmZW9nYXp1a3F3bGVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMzEzOTcsImV4cCI6MjA4ODcwNzM5N30.ECu2YvMQt5EwSLisTiaV-gfEAxFELglOMG7BQAsod14",
-        "--dart-define=SPOONACULAR_API_KEY=9ba756725e97405582aacdce34a5e763"
+        "--dart-define=SUPABASE_URL=${env:SUPABASE_URL}",
+        "--dart-define=SUPABASE_ANON_KEY=${env:SUPABASE_ANON_KEY}",
+        "--dart-define=SPOONACULAR_API_KEY=${env:SPOONACULAR_API_KEY}"
+      ]
+    },
+    {
+      "name": "Debug (Local Supabase Desktop)",
+      "request": "launch",
+      "type": "dart",
+      "args": [
+        "--dart-define=SUPABASE_URL=http://127.0.0.1:54321",
+        "--dart-define=SUPABASE_ANON_KEY=${env:SUPABASE_LOCAL_ANON_KEY}",
+        "--dart-define=SPOONACULAR_API_KEY=${env:SPOONACULAR_API_KEY}"
+      ]
+    },
+    {
+      "name": "Debug (Local Supabase Android Emulator)",
+      "request": "launch",
+      "type": "dart",
+      "args": [
+        "--dart-define=SUPABASE_URL=http://10.0.2.2:54321",
+        "--dart-define=SUPABASE_ANON_KEY=${env:SUPABASE_LOCAL_ANON_KEY}",
+        "--dart-define=SPOONACULAR_API_KEY=${env:SPOONACULAR_API_KEY}"
+      ]
+    },
+    {
+      "name": "Profile (Cloud Supabase from env)",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "profile",
+      "args": [
+        "--dart-define=SUPABASE_URL=${env:SUPABASE_URL}",
+        "--dart-define=SUPABASE_ANON_KEY=${env:SUPABASE_ANON_KEY}",
+        "--dart-define=SPOONACULAR_API_KEY=${env:SPOONACULAR_API_KEY}"
       ]
     }
   ]

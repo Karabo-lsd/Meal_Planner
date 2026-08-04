@@ -206,10 +206,6 @@ check(
     ),
 )
 check(
-    "GET /v1/ingredients/barcode/{barcode}",
-    lambda: assert_status(requests.get(f"{BASE}/v1/ingredients/barcode/12345678", timeout=10), (200,)),
-)
-check(
     "POST /v1/ingredients/convert",
     lambda: assert_status(
         requests.post(

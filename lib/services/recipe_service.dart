@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/foundation.dart';
 
 import 'spoonacular_service.dart';
 
@@ -54,7 +55,10 @@ class RecipeService {
     try {
       final rows = await _spoonacular.searchRecipes(number: limit);
       if (rows.isNotEmpty) return rows;
-    } catch (_) {}
+      debugPrint('RecipeService: Spoonacular returned 0 recipes; falling back.');
+    } catch (e) {
+      debugPrint('RecipeService: Spoonacular failed: $e');
+    }
 
     // 2. Supabase catalog
     try {
@@ -65,7 +69,10 @@ class RecipeService {
           .limit(limit);
       final list = List<Map<String, dynamic>>.from(rows);
       if (list.isNotEmpty) return list;
-    } catch (_) {}
+      debugPrint('RecipeService: Supabase recipes returned 0 rows; using mock fallback.');
+    } catch (e) {
+      debugPrint('RecipeService: Supabase recipes fallback failed: $e');
+    }
 
     // 3. Static fallback
     return _mockRecipes.take(limit).toList();
@@ -117,7 +124,10 @@ class RecipeService {
         includeIngredients: ingredients.isEmpty ? null : ingredients,
       );
       if (rows.isNotEmpty) return rows;
-    } catch (_) {}
+      debugPrint('RecipeService: Spoonacular personalized returned 0 recipes; falling back.');
+    } catch (e) {
+      debugPrint('RecipeService: Spoonacular personalized failed: $e');
+    }
 
     // 2. Fall back to popular recipes (Spoonacular without filters → Supabase → mocks)
     return getRecommendedRecipes(limit: limit);

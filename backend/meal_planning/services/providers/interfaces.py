@@ -35,11 +35,6 @@ class UsdaClientInterface(Protocol):
         ...
 
 
-class OpenFoodFactsClientInterface(Protocol):
-    async def lookup_barcode(self, barcode: str) -> Optional[Dict[str, Any]]:
-        ...
-
-
 class ImageRecognitionClientInterface(Protocol):
     async def analyze_food_image(self, image_bytes: bytes) -> Dict[str, Any]:
         """

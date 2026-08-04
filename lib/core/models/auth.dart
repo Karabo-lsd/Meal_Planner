@@ -21,13 +21,14 @@ class AuthState {
   AuthState copyWith({
     bool? isLoading,
     User? user,
+    bool clearUser = false,
     String? token,
     String? error,
     String? successMessage,
   }) {
     return AuthState(
       isLoading: isLoading ?? this.isLoading,
-      user: user ?? this.user,
+      user: clearUser ? null : (user ?? this.user),
       token: token ?? this.token,
       error: error,
       successMessage: successMessage,

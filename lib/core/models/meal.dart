@@ -6,7 +6,7 @@ class Meal {
   final String mealSlot;  // 'breakfast' | 'lunch' | 'dinner' | 'snack'
   final String? canonicalFoodId;
   final String? recipeId;
-  final String source;    // 'manual' | 'recipe' | 'barcode' | 'image_scan' | 'imported'
+  final String source;    // 'manual' | 'recipe' | 'image_scan' | 'imported'
   final double? quantity;
   final String? unit;
   final double? calories;

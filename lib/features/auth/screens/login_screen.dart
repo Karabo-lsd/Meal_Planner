@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers.dart';
+import '../../../features/profile/onboarding_profile_sheet.dart';
 import '../../../shared/widgets/glass_panel.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../../../shared/widgets/text_input.dart';
@@ -16,6 +17,12 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() => ref.read(authStateProvider.notifier).clearMessages());
+  }
 
   @override
   void dispose() {
@@ -41,19 +48,51 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     ref.read(authStateProvider.notifier).login(email, pass);
   }
 
+  void _showOnboardingIfNeeded() {
+    final profile = ref.read(dietaryProfileProvider);
+    if (profile.isNotEmpty && ref.read(dietaryProfileProvider.notifier).hasCompletedOnboarding()) {
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (sheetContext) {
+        return OnboardingProfileSheet(
+          onSaved: () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            }
+            Navigator.of(context).pushReplacementNamed('/home');
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
+    final colorScheme = Theme.of(context).colorScheme;
 
     // if login completed, navigate to home
-    if (authState.user != null) {
+    final hasAuthenticatedUser = authState.user != null;
+
+    if (hasAuthenticatedUser) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.of(context).pushReplacementNamed('/home');
+        if (ref.read(dietaryProfileProvider.notifier).hasCompletedOnboarding()) {
+          Navigator.of(context).pushReplacementNamed('/home');
+        } else {
+          _showOnboardingIfNeeded();
+        }
       });
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFEDEFFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Stack(
           children: [
@@ -63,10 +102,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               child: Container(
                 width: 260,
                 height: 260,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
-                    colors: [Color(0x66B9C7FF), Color(0x00B9C7FF)],
+                    colors: [
+                      colorScheme.primary.withValues(alpha: 0.22),
+                      colorScheme.primary.withValues(alpha: 0),
+                    ],
                   ),
                 ),
               ),
@@ -77,84 +119,119 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               child: Container(
                 width: 230,
                 height: 230,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
-                    colors: [Color(0x66FFD8B9), Color(0x00FFD8B9)],
+                    colors: [
+                      colorScheme.secondary.withValues(alpha: 0.18),
+                      colorScheme.secondary.withValues(alpha: 0),
+                    ],
                   ),
                 ),
               ),
             ),
-            SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 24),
-                  Text(
-                    'Welcome Back',
-                    style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Sign in to continue planning your meals.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: const Color(0xFF7D8799),
-                        ),
-                  ),
-                  const SizedBox(height: 24),
-                  GlassPanel(
-                    padding: const EdgeInsets.all(18),
-                    radius: 20,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        TextInput(
-                          controller: _emailController,
-                          label: 'Email',
-                          keyboardType: TextInputType.emailAddress,
-                        ),
-                        const SizedBox(height: 14),
-                        TextInput(
-                          controller: _passwordController,
-                          label: 'Password',
-                          obscure: true,
-                        ),
-                        const SizedBox(height: 18),
-                        if (authState.error != null)
+            LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight - 48),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 520),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
                           Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFF0F0),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              authState.error!,
-                              style: const TextStyle(color: Colors.redAccent),
+                            alignment: Alignment.center,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primaryContainer.withValues(alpha: 0.75),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                'Smart Meal Planner',
+                                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                      color: colorScheme.primary,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                              ),
                             ),
                           ),
-                        if (authState.error != null) const SizedBox(height: 12),
-                        PrimaryButton(
-                          label: 'Log In',
-                          loading: authState.isLoading,
-                          onPressed: _submit,
-                        ),
-                      ],
+                          const SizedBox(height: 16),
+                          Text(
+                            'Welcome Back',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  height: 1.05,
+                                ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Sign in to continue planning your meals.',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.onSurface.withValues(alpha: 0.78),
+                            ),
+                          ),
+                          const SizedBox(height: 28),
+                          GlassPanel(
+                            padding: const EdgeInsets.all(20),
+                            radius: 24,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                TextInput(
+                                  controller: _emailController,
+                                  label: 'Email',
+                                  keyboardType: TextInputType.emailAddress,
+                                ),
+                                const SizedBox(height: 14),
+                                TextInput(
+                                  controller: _passwordController,
+                                  label: 'Password',
+                                  obscure: true,
+                                ),
+                                const SizedBox(height: 18),
+                                if (authState.error != null)
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.errorContainer,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      authState.error!,
+                                      style: TextStyle(color: colorScheme.onErrorContainer),
+                                    ),
+                                  ),
+                                if (authState.error != null) const SizedBox(height: 12),
+                                PrimaryButton(
+                                  label: 'Log In',
+                                  loading: authState.isLoading,
+                                  onPressed: _submit,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Center(
+                            child: TextButton(
+                              onPressed: () {
+                                ref.read(authStateProvider.notifier).clearMessages();
+                                Navigator.of(context).pushReplacementNamed('/register');
+                              },
+                              child: const Text("Don't have an account? Register"),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 14),
-                  Center(
-                    child: TextButton(
-                      onPressed: () {
-                        Navigator.of(context).pushReplacementNamed('/register');
-                      },
-                      child: const Text("Don't have an account? Register"),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ],

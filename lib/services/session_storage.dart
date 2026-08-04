@@ -61,6 +61,8 @@ class SessionStorage {
   static const _kPantry = 'pantry';
   static const _kSavedIds = 'saved_ids';
   static const _kTab = 'tab';
+  static const _kProfileSetupReminderDismissed = 'profile_setup_reminder_dismissed';
+  static const _kCheckedGroceries = 'checked_groceries';
 
   // profile -----------------------------------------------------------------
 
@@ -131,4 +133,26 @@ class SessionStorage {
 
   static Future<void> saveTab(String userId, int index) =>
       save(userId, _kTab, index);
+
+  static bool hasProfileSetupReminderBeenDismissed(String userId) {
+    final raw = load(userId, _kProfileSetupReminderDismissed);
+    return raw is bool ? raw : false;
+  }
+
+  static Future<void> markProfileSetupReminderDismissed(String userId) =>
+      save(userId, _kProfileSetupReminderDismissed, true);
+
+  // checked groceries -------------------------------------------------------
+
+  static Future<void> saveCheckedGroceries(String userId, Iterable<String> items) =>
+      save(userId, _kCheckedGroceries, items.toList());
+
+  static Set<String>? loadCheckedGroceries(String userId) {
+    final raw = load(userId, _kCheckedGroceries);
+    if (raw == null) return null;
+    return (raw as List)
+        .map((e) => e.toString().trim().toLowerCase())
+        .where((e) => e.isNotEmpty)
+        .toSet();
+  }
 }

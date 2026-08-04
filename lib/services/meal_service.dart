@@ -1,35 +1,44 @@
 import 'dart:io';
-import 'package:dio/dio.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' hide MultipartFile;
-import '../core/config/app_config.dart';
-import 'api_client.dart';
+import 'dart:convert';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class MealService {
   final _supabase = Supabase.instance.client;
-  final Dio _dio = ApiClient.instance;
 
   String get _userId => _supabase.auth.currentUser!.id;
 
-  // ── ML image analysis (Python backend) ───────────────────
-  // This stays on the Python backend — Supabase has no vision API.
+  // ── ML image analysis (Supabase Edge Function) ────────────
 
   Future<Map<String, dynamic>> analyzeMealImage(File imageFile) async {
+    final bytes = await imageFile.readAsBytes();
+    final filename = imageFile.uri.pathSegments.isNotEmpty
+        ? imageFile.uri.pathSegments.last
+        : 'meal_image.jpg';
+
     try {
-      final formData = FormData.fromMap({
-        'file': await MultipartFile.fromFile(
-          imageFile.path,
-          filename: 'meal_image.jpg',
-        ),
-      });
-      final response = await _dio.post(
-        AppConfig.analyzeMeal,
-        data: formData,
-        options: Options(headers: {'Content-Type': 'multipart/form-data'}),
+      final response = await _supabase.functions.invoke(
+        'analyze-meal-image',
+        body: {
+          'user_id': _userId,
+          'filename': filename,
+          'image_base64': base64Encode(bytes),
+        },
       );
-      return response.data as Map<String, dynamic>;
-    } on DioException catch (e) {
-      throw _handleDioError(e);
+
+      final payload = response.data;
+      if (payload is Map<String, dynamic>) {
+        return payload;
+      }
+
+      // Some function handlers return { data: {...} }.
+      if (payload is Map && payload['data'] is Map<String, dynamic>) {
+        return Map<String, dynamic>.from(payload['data'] as Map);
+      }
+    } catch (_) {
+      // Fall through to catalog-only fallback.
     }
+
+    return _fallbackAnalyzeFromCatalog(filename);
   }
 
   // ── food_logs CRUD (Supabase) ─────────────────────────────
@@ -148,14 +157,55 @@ class MealService {
 
   // ── Helpers ───────────────────────────────────────────────
 
-  Exception _handleDioError(DioException e) {
-    if (e.response != null) {
-      final data = e.response!.data;
-      if (data is Map<String, dynamic> && data.containsKey('detail')) {
-        return Exception(data['detail'] as String);
-      }
-      return Exception('Server error: ${e.response!.statusCode}');
+  Future<Map<String, dynamic>> _fallbackAnalyzeFromCatalog(
+      String filename) async {
+    final guess = filename
+        .toLowerCase()
+        .replaceAll(RegExp(r'\.[a-z0-9]+$'), '')
+        .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+        .trim();
+
+    final tokens = guess
+        .split(' ')
+        .where((t) => t.length >= 3)
+        .toList(growable: false);
+
+    for (final token in tokens.take(5)) {
+      final rows = await _supabase
+          .from('foods_master')
+          .select('id, canonical_name, food_nutrition(*)')
+          .ilike('canonical_name', '%$token%')
+          .limit(1);
+
+      final list = List<Map<String, dynamic>>.from(rows as List);
+      if (list.isEmpty) continue;
+
+      final food = list.first;
+      final nutrition =
+          (food['food_nutrition'] as Map<String, dynamic>?) ?? const {};
+
+      return {
+        'meal_title': food['canonical_name'] ?? 'Scanned Meal',
+        'meal_type': 'Meal',
+        'confidence': 0.45,
+        'canonical_food_id': food['id'],
+        'calories': (nutrition['per_100g_calories'] as num?)?.round() ?? 0,
+        'protein': (nutrition['per_100g_protein'] as num?)?.toDouble() ?? 0,
+        'carbs': (nutrition['per_100g_carbs'] as num?)?.toDouble() ?? 0,
+        'fat': (nutrition['per_100g_fat'] as num?)?.toDouble() ?? 0,
+        'source': 'supabase_catalog_fallback',
+      };
     }
-    return Exception('Network error: ${e.message}');
+
+    return {
+      'meal_title': 'Scanned Meal',
+      'meal_type': 'Meal',
+      'confidence': 0.2,
+      'calories': 0,
+      'protein': 0,
+      'carbs': 0,
+      'fat': 0,
+      'source': 'supabase_catalog_fallback',
+    };
   }
 }

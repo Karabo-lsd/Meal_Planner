@@ -8,6 +8,7 @@ import 'models/auth.dart';
 import 'models/user.dart';
 import 'models/ingredient.dart';
 import 'models/recipe.dart';
+import 'profile_onboarding.dart';
 
 /// Providers for various application services. These wrap the singletons
 /// defined in `services.dart` and expose them to the widget layer via
@@ -16,6 +17,7 @@ import 'models/recipe.dart';
 final apiClientProvider = Provider.autoDispose((ref) => ApiClient.instance);
 final authServiceProvider = Provider.autoDispose((ref) => AuthService());
 final mealServiceProvider = Provider.autoDispose((ref) => MealService());
+final mealPlanServiceProvider = Provider.autoDispose((ref) => MealPlanService());
 final recipeServiceProvider = Provider.autoDispose((ref) => RecipeService());
 final analyticsServiceProvider = Provider.autoDispose((ref) => AnalyticsService());
 final userProfileServiceProvider = Provider.autoDispose((ref) => UserProfileService());
@@ -136,7 +138,21 @@ class DietaryProfileNotifier extends StateNotifier<Map<String, dynamic>> {
 
     // 2. Refresh from Supabase in background.
     try {
-      final fresh = await ref.read(userProfileServiceProvider).getProfile() ?? {};
+      final service = ref.read(userProfileServiceProvider);
+      final profile = await service.getProfile() ?? const <String, dynamic>{};
+      final prefs =
+          await service.getDietaryPreferences() ?? const <String, dynamic>{};
+      final fresh = {
+        ...profile,
+        if (prefs['diet_type'] != null) 'diet_type': prefs['diet_type'],
+        'preferences': {
+          ...(profile['preferences'] is Map
+              ? Map<String, dynamic>.from(profile['preferences'] as Map)
+              : const <String, dynamic>{}),
+          if (prefs['diet_type'] != null) 'diet': prefs['diet_type'],
+        },
+      };
+
       if (fresh.isNotEmpty) {
         state = fresh;
         SessionStorage.saveProfile(userId, fresh);
@@ -145,10 +161,58 @@ class DietaryProfileNotifier extends StateNotifier<Map<String, dynamic>> {
   }
 
   Future<void> updateProfile(Map<String, dynamic> data) async {
-    state = await ref.read(userProfileServiceProvider).updateProfile(data);
+    final mergedProfile = <String, dynamic>{...state};
+
+    if (data['preferences'] is Map && mergedProfile['preferences'] is Map) {
+      mergedProfile['preferences'] = {
+        ...Map<String, dynamic>.from(mergedProfile['preferences'] as Map),
+        ...Map<String, dynamic>.from(data['preferences'] as Map),
+      };
+    } else if (data['preferences'] is Map) {
+      mergedProfile['preferences'] = Map<String, dynamic>.from(data['preferences'] as Map);
+    }
+
+    if (data['goals'] is Map && mergedProfile['goals'] is Map) {
+      mergedProfile['goals'] = {
+        ...Map<String, dynamic>.from(mergedProfile['goals'] as Map),
+        ...Map<String, dynamic>.from(data['goals'] as Map),
+      };
+    } else if (data['goals'] is Map) {
+      mergedProfile['goals'] = Map<String, dynamic>.from(data['goals'] as Map);
+    }
+
+    for (final entry in data.entries) {
+      if (entry.key != 'preferences' && entry.key != 'goals') {
+        mergedProfile[entry.key] = entry.value;
+      }
+    }
+
+    state = mergedProfile;
+
     final userId = _uid;
-    if (userId != null) SessionStorage.saveProfile(userId, state);
+    if (userId != null) {
+      await SessionStorage.saveProfile(userId, state);
+    }
+
+    try {
+      final serverProfile = await ref.read(userProfileServiceProvider).updateProfile(data);
+      if (serverProfile.isNotEmpty) {
+        state = {
+          ...mergedProfile,
+          ...serverProfile,
+        };
+        if (userId != null) {
+          await SessionStorage.saveProfile(userId, state);
+        }
+      }
+    } catch (_) {
+      // Keep the locally updated profile so the app feels responsive even when
+      // the backend is unavailable.
+      rethrow;
+    }
   }
+
+  bool hasCompletedOnboarding() => hasCompleteOnboardingProfile(state);
 }
 
 List<Recipe> _fallbackRecipes() {
@@ -248,8 +312,68 @@ final recommendationsProvider = FutureProvider<List<Recipe>>((ref) async {
   }
 });
 
+final nutritionSummaryProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  final currentUser = supa.Supabase.instance.client.auth.currentUser;
+  if (currentUser == null) return const <String, dynamic>{};
+
+  try {
+    return await ref.read(analyticsServiceProvider).getNutritionSummary();
+  } catch (_) {
+    return const <String, dynamic>{};
+  }
+});
+
+final goalProgressProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  final currentUser = supa.Supabase.instance.client.auth.currentUser;
+  if (currentUser == null) return const <String, dynamic>{};
+
+  try {
+    return await ref.read(analyticsServiceProvider).getGoalProgress();
+  } catch (_) {
+    return const <String, dynamic>{};
+  }
+});
+
+final savedRecipesProvider = FutureProvider<List<Recipe>>((ref) async {
+  final currentUser = supa.Supabase.instance.client.auth.currentUser;
+  if (currentUser == null) return const <Recipe>[];
+
+  try {
+    final rows = await ref.read(recipeServiceProvider).getSavedRecipes(limit: 100);
+    return rows
+        .map((row) {
+          final nested = row['recipes'];
+          if (nested is Map<String, dynamic>) {
+            return Recipe.fromJson(nested);
+          }
+          if (nested is Map) {
+            return Recipe.fromJson(Map<String, dynamic>.from(nested));
+          }
+          return null;
+        })
+        .whereType<Recipe>()
+        .toList();
+  } catch (_) {
+    return const <Recipe>[];
+  }
+});
+
 final recommendationEngineProvider =
     Provider.autoDispose((ref) => RecommendationEngine());
+
+final activeMealPlanProvider = FutureProvider<Map<String, dynamic>?>((ref) async {
+  final currentUser = supa.Supabase.instance.client.auth.currentUser;
+  if (currentUser == null) return null;
+  return ref.read(mealPlanServiceProvider).getActivePlan();
+});
+
+final activeMealPlanItemsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final plan = await ref.watch(activeMealPlanProvider.future);
+  if (plan == null) return const <Map<String, dynamic>>[];
+  final planId = plan['id']?.toString();
+  if (planId == null || planId.isEmpty) return const <Map<String, dynamic>>[];
+  return ref.read(mealPlanServiceProvider).getPlanItems(planId);
+});
 
 // ── Saved recipes (favourites) ────────────────────────────────────────────────
 
@@ -312,7 +436,7 @@ final savedRecipeIdsProvider =
 // ── Auth helpers ─────────────────────────────────────────────────────────────
 
 /// Maps common Supabase auth error codes to user-friendly messages.
-String _authErrorMessage(Object e) {
+String formatAuthErrorMessage(Object e) {
   if (e is supa.AuthApiException) {
     switch (e.code) {
       case 'email_address_invalid':
@@ -335,10 +459,33 @@ String _authErrorMessage(Object e) {
         return e.message;
     }
   }
-  // Strip the raw Dart exception wrapper so only the message is shown
-  final raw = e.toString();
-  final match = RegExp(r'message:\s*(.+?)(?:,|\))', dotAll: true).firstMatch(raw);
-  return match?.group(1)?.trim() ?? raw;
+
+  final raw = e.toString().toLowerCase();
+  if (raw.contains('socketexception') ||
+      raw.contains('connection refused') ||
+      raw.contains('failed host lookup') ||
+      raw.contains('timed out') ||
+      raw.contains('connection reset')) {
+    const configuredSupabaseUrl = String.fromEnvironment(
+      'SUPABASE_URL',
+      defaultValue: '',
+    );
+    final effectiveSupabaseUrl = configuredSupabaseUrl.isNotEmpty
+        ? configuredSupabaseUrl
+        : 'http://127.0.0.1:54321';
+    return 'We could not reach the server at $effectiveSupabaseUrl. Confirm SUPABASE_URL / SUPABASE_ANON_KEY are from the same project. For local Supabase use http:// (not https://), and on Android emulator use http://10.0.2.2:54321.';
+  }
+
+  if (raw.contains('relation "public.users" does not exist') ||
+      raw.contains('relation "public.user_profiles" does not exist') ||
+      raw.contains('relation "users" does not exist') ||
+      raw.contains('relation "user_profiles" does not exist')) {
+    return 'Your Supabase database schema is not initialized. Run migrations, then try again.';
+  }
+
+  // Strip the raw Dart exception wrapper so only the message is shown.
+  final match = RegExp(r'message:\s*(.+?)(?:,|\))', dotAll: true).firstMatch(e.toString());
+  return match?.group(1)?.trim() ?? e.toString();
 }
 
 // authentication state
@@ -359,10 +506,28 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final response = await _service.signIn(email, password);
-      final supaUser = response.user;
+      final supaUser = response.user ?? supa.Supabase.instance.client.auth.currentUser;
       if (supaUser == null) {
         state = state.copyWith(isLoading: false, error: 'Sign in failed. Please try again.');
         return;
+      }
+
+      // Ensure app-facing profile row exists in public.user_profiles.
+      try {
+        final existingProfile = await ref.read(userProfileServiceProvider).getProfile();
+        if (existingProfile == null || existingProfile.isEmpty) {
+          final fullName = (supaUser.userMetadata?['full_name'] as String?)?.trim() ?? '';
+          final parts = fullName.isEmpty ? const <String>[] : fullName.split(RegExp(r'\s+'));
+          final firstName = parts.isNotEmpty ? parts.first : null;
+          final lastName = parts.length > 1 ? parts.sublist(1).join(' ') : null;
+
+          await ref.read(userProfileServiceProvider).upsertProfile({
+            ...?firstName != null ? {'first_name': firstName} : null,
+            ...?lastName != null ? {'last_name': lastName} : null,
+          });
+        }
+      } catch (_) {
+        // Continue login even if profile bootstrap fails.
       }
 
       // Fetch user_profiles row so we have the saved first/last name
@@ -385,7 +550,7 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
       }
       state = state.copyWith(isLoading: false, user: user);
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: _authErrorMessage(e));
+      state = state.copyWith(isLoading: false, error: formatAuthErrorMessage(e));
     }
   }
 
@@ -397,7 +562,7 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final response = await _service.signUp(email, password, fullName: fullName);
-      final supaUser = response.user;
+      final supaUser = response.user ?? supa.Supabase.instance.client.auth.currentUser;
 
       if (supaUser == null) {
         state = state.copyWith(
@@ -412,35 +577,33 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
       final lastName =
           parts.length > 1 ? parts.sublist(1).join(' ') : null;
 
+      // Registration always returns to login flow.
+      // Persist name metadata when possible, then sign out any auto-session.
       if (response.session != null) {
-        // No email confirmation required — user is immediately signed in.
-        // Persist name to user_profiles so it's retrievable on next login.
         try {
           await ref.read(userProfileServiceProvider).upsertProfile({
             'first_name': firstName,
             'last_name': lastName,
           });
         } catch (_) {
-          // Profile save failed — not critical, user can update later
+          // Profile save failed — not critical, user can provide details after login.
         }
-
-        final user = User.fromJson({
-          'id': supaUser.id,
-          'email': supaUser.email ?? email,
-          'first_name': firstName,
-          'last_name': lastName,
-        });
-        state = state.copyWith(isLoading: false, user: user);
-      } else {
-        // Email confirmation required — inform the user.
-        state = state.copyWith(
-          isLoading: false,
-          successMessage:
-              'Account created! Check your email to confirm your account, then log in.',
-        );
+        try {
+          await _service.signOut();
+        } catch (_) {
+          // Ignore sign-out failures; screen flow still redirects to login.
+        }
       }
+
+      state = state.copyWith(
+        isLoading: false,
+        clearUser: true,
+        successMessage: response.session == null
+            ? 'Account created. Please check your email to confirm your account before logging in.'
+            : 'Account created successfully. Please log in with your new credentials.',
+      );
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: _authErrorMessage(e));
+      state = state.copyWith(isLoading: false, error: formatAuthErrorMessage(e));
     }
   }
 
@@ -466,17 +629,29 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
 
   Future<void> updateCurrentUserProfile(Map<String, dynamic> data) async {
     state = state.copyWith(isLoading: true, error: null);
+
+    final currentUser = state.user;
+    if (currentUser != null) {
+      final updatedUser = User.fromJson({
+        ...currentUser.toJson(),
+        ...data,
+      });
+      state = state.copyWith(isLoading: false, user: updatedUser);
+    }
+
     try {
       await ref.read(userProfileServiceProvider).upsertProfile(data);
-      // Keep cached profile in sync.
       final userId = supa.Supabase.instance.client.auth.currentUser?.id;
       if (userId != null) {
         SessionStorage.saveProfile(userId, data);
       }
-      state = state.copyWith(isLoading: false);
+      state = state.copyWith(isLoading: false, error: null);
     } catch (e) {
+      final userId = supa.Supabase.instance.client.auth.currentUser?.id;
+      if (userId != null) {
+        SessionStorage.saveProfile(userId, data);
+      }
       state = state.copyWith(isLoading: false, error: e.toString());
-      rethrow;
     }
   }
 
