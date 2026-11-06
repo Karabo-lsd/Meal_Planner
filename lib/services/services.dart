@@ -1,0 +1,12 @@
+export 'api_client.dart';
+export 'auth_service.dart';
+export 'session_storage.dart';
+export 'meal_service.dart';
+export 'meal_plan_service.dart';
+export 'recipe_service.dart';
+export 'analytics_service.dart';
+export 'user_profile_service.dart';
+export 'ingredient_service.dart';
+export 'recommendation_engine.dart';
+export 'external_integrations.dart';
+export 'food_scan_service.dart';
